@@ -16,6 +16,7 @@ package io.prestosql.plugin.mongodb;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.mongodb.MongoClient;
+import io.airlift.log.Logger;
 import io.prestosql.testing.AbstractTestIntegrationSmokeTest;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
@@ -244,6 +245,26 @@ public class TestMongoIntegrationSmokeTest
     }
 
     @Test
+    public void testDates()
+    {
+        Logger.get(TestMongoIntegrationSmokeTest.class).debug("Starting date tests");
+        Logger.get(TestMongoIntegrationSmokeTest.class).debug("--------------------------------------");
+        String values = "VALUES " +
+                " (10, NULL, NULL)," +
+                " (11, from_iso8601_timestamp('2020-01-01T00:00:00+00:00'), from_iso8601_timestamp('2020-01-15T00:00:00+00:00'))," +
+                " (12, from_iso8601_timestamp('2020-02-01T00:00:00+00:00'), from_iso8601_timestamp('2020-02-15T00:00:00+00:00'))," +
+                " (13, from_iso8601_timestamp('2020-03-01T00:00:00+00:00'), from_iso8601_timestamp('2020-03-15T00:00:00+00:00'))," +
+                " (14, from_iso8601_timestamp('2020-04-01T00:00:00+00:00'), NULL)," +
+                " (15, NULL, from_iso8601_timestamp('2020-05-15T00:00:00+00:00'))";
+        String inlineTable = format("(%s) AS t(i, one, two)", values);
+
+        assertUpdate("DROP TABLE IF EXISTS tmp_timestamp");
+        assertUpdate("CREATE TABLE tmp_timestamp AS SELECT * FROM " + inlineTable, 6);
+
+        assertQuery("SELECT i FROM tmp_timestamp WHERE one > from_unixtime(1581292800) AND one < from_unixtime(1588291200)", "VALUES 13, 14");
+    }
+
+    @Test
     public void testObjectIds()
     {
         String values = "VALUES " +
@@ -306,6 +327,16 @@ public class TestMongoIntegrationSmokeTest
         assertQuery("SELECT * FROM test.view_base", "SELECT 'foo'");
         assertUpdate("DROP TABLE test.test_view");
         assertUpdate("DROP TABLE test.view_base");
+    }
+
+    @Test
+    public void testCaseInsensitive()
+            throws Exception
+    {
+        assertQuery("SELECT name, value FROM cameldb.cameltable", "SELECT 'asdf', 1");
+        assertUpdate("INSERT INTO cameldb.cameltable VALUES('qwer', 2)", 1);
+
+        assertQuery("SELECT value FROM cameldb.cameltable where name = 'qwer'", "SELECT 2");
     }
 
     @Test

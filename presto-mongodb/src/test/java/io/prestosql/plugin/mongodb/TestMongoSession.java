@@ -22,6 +22,8 @@ import io.prestosql.spi.predicate.ValueSet;
 import org.bson.Document;
 import org.testng.annotations.Test;
 
+import java.util.Date;
+
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.predicate.Range.equal;
 import static io.prestosql.spi.predicate.Range.greaterThan;
@@ -29,15 +31,17 @@ import static io.prestosql.spi.predicate.Range.greaterThanOrEqual;
 import static io.prestosql.spi.predicate.Range.lessThan;
 import static io.prestosql.spi.predicate.Range.range;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 
 public class TestMongoSession
 {
-    private static final MongoColumnHandle COL1 = new MongoColumnHandle("col1", BIGINT, false);
-    private static final MongoColumnHandle COL2 = new MongoColumnHandle("col2", createUnboundedVarcharType(), false);
+    private static final MongoColumnHandle COL1 = new MongoColumnHandle("Col1", BIGINT, false);
+    private static final MongoColumnHandle COL2 = new MongoColumnHandle("Col2", createUnboundedVarcharType(), false);
     private static final MongoColumnHandle COL3 = new MongoColumnHandle("col3", createUnboundedVarcharType(), false);
+    private static final MongoColumnHandle COL4 = new MongoColumnHandle("Col4", TIMESTAMP, false);
 
     @Test
     public void testBuildQuery()
@@ -88,6 +92,20 @@ public class TestMongoSession
         Document expected = new Document("$or", asList(
                 new Document(COL1.getName(), new Document("$lt", 100L)),
                 new Document(COL1.getName(), new Document("$gt", 200L))));
+        assertEquals(query, expected);
+    }
+
+    @Test
+    public void testBuildQueryGreaterThanWithTimestamp()
+    {
+        TupleDomain<ColumnHandle> tupleDomain = TupleDomain.withColumnDomains(ImmutableMap.of(
+                COL4, Domain.create(ValueSet.ofRanges(lessThan(TIMESTAMP, 1588398833L),
+                        greaterThan(TIMESTAMP, 1588398999L)), false)));
+
+        Document query = MongoSession.buildQuery(tupleDomain);
+        Document expected = new Document("$or", asList(
+                new Document(COL4.getName(), new Document("$lt", new Date(1588398833L))),
+                new Document(COL4.getName(), new Document("$gt", new Date(1588398999L)))));
         assertEquals(query, expected);
     }
 
